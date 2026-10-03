@@ -39,6 +39,9 @@ const URGENCY: Record<string, string> = {
 };
 
 const URGENCY_LABEL: Record<string, string> = { low: "низкая", medium: "средняя", high: "высокая" };
+const INTENT_LABEL: Record<string, string> = {
+  order_status_check: "Статус заказа", return_request: "Возврат", order_change: "Изменение заказа", general_faq: "Общий вопрос",
+};
 const SENTIMENT_LABEL: Record<string, { label: string; cls: string }> = {
   positive: { label: "позитив", cls: "text-brand-700 dark:text-brand-300" },
   neutral: { label: "нейтрально", cls: "" },
@@ -308,7 +311,7 @@ function AiCard({ c, busy, onDraft, onSend, onAction }: {
           <Sparkles className="size-3.5" /> AI-анализ ({r.engine === "rules" ? "правила" : `${r.engine === "groq" ? "Groq" : "Gemini"} · ${r.model}`})
           <span className="font-normal text-slate-600 dark:text-slate-400">· текст: {r.replySource === "llm" ? "AI, тон под настроение" : "шаблон"}</span>
         </span>
-        <Chip>{r.intent}</Chip>
+        <Chip>{INTENT_LABEL[r.intent] ?? r.intent}</Chip>
         <Chip>{r.topic}</Chip>
         <Chip><span className={URGENCY[r.urgency]}>срочность: {URGENCY_LABEL[r.urgency]}</span></Chip>
         <Chip><span className={SENTIMENT_LABEL[r.sentiment].cls}>настроение: {SENTIMENT_LABEL[r.sentiment].label}</span></Chip>
