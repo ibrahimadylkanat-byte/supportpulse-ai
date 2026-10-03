@@ -12,6 +12,7 @@ export const normalizePhone = (p: string) => {
 async function ms(path: string) {
   const res = await fetch(API + path, {
     headers: { Authorization: `Bearer ${token()}`, "Accept-Encoding": "gzip" },
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`МойСклад ${res.status}`);
   return res.json();
@@ -37,25 +38,40 @@ function mapOrder(o: any): MsOrder {
 
 const EXPAND = "expand=state,agent,positions.assortment";
 
+// С токеном сначала ищем в настоящем МойСклад, не нашли или API недоступен — в демо-данных,
+// чтобы сценарии A–I работали рядом с реальными заказами.
+// ponytail: гибрид для демо; в проде убрать фолбэк на mockData.
+const mockById = (id: string) => orders.find((o) => o.id === id) ?? null;
+
 export async function findOrderById(id: string): Promise<MsOrder | null> {
-  if (!token()) return orders.find((o) => o.id === id) ?? null;
-  const data = await ms(`/entity/customerorder?filter=name=${encodeURIComponent(id)}&${EXPAND}`);
-  return data.rows?.[0] ? mapOrder(data.rows[0]) : null;
+  if (!token()) return mockById(id);
+  try {
+    const data = await ms(`/entity/customerorder?filter=name=${encodeURIComponent(id)}&${EXPAND}`);
+    if (data.rows?.[0]) return mapOrder(data.rows[0]);
+  } catch (e) {
+    console.error(String(e));
+  }
+  return mockById(id);
 }
 
 /** Заказы покупателя по телефону, свежие первыми. */
 export async function findOrdersByPhone(phone: string): Promise<MsOrder[]> {
   const p = normalizePhone(phone);
-  if (!token()) {
-    return orders
-      .filter((o) => normalizePhone(o.phone) === p)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const mock = () => orders
+    .filter((o) => normalizePhone(o.phone) === p)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!token()) return mock();
+  try {
+    const cp = await ms(`/entity/counterparty?search=${p}`);
+    const agent = cp.rows?.[0];
+    if (agent) {
+      const data = await ms(`/entity/customerorder?filter=agent=${agent.meta.href}&order=moment,desc&${EXPAND}`);
+      if (data.rows?.length) return data.rows.map(mapOrder);
+    }
+  } catch (e) {
+    console.error(String(e));
   }
-  const cp = await ms(`/entity/counterparty?search=${p}`);
-  const agent = cp.rows?.[0];
-  if (!agent) return [];
-  const data = await ms(`/entity/customerorder?filter=agent=${agent.meta.href}&order=moment,desc&${EXPAND}`);
-  return (data.rows ?? []).map(mapOrder);
+  return mock();
 }
 
 // ponytail: mock — в реальном режиме это смена статуса customerorder через PUT /entity/customerorder/{id}.
