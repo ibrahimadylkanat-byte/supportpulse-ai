@@ -36,7 +36,8 @@ function mapOrder(o: any): MsOrder {
   };
 }
 
-const EXPAND = "expand=state,agent,positions.assortment";
+// МойСклад раскрывает expand в списках только при limit ≤ 100
+const EXPAND = "limit=10&expand=state,agent,positions.assortment";
 
 // С токеном сначала ищем в настоящем МойСклад, не нашли или API недоступен — в демо-данных,
 // чтобы сценарии A–I работали рядом с реальными заказами.
