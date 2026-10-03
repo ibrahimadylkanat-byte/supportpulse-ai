@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Дизайн-токены SupportPulse: «trust blue» для B2B-поддержки + статусные цвета Tailwind (emerald/amber/rose). */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
+
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb; /* основной: белый текст 5.2:1 */
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+
+  /* Графики: категориальная палитра (проверена на CVD) и диверговая пара для настроения */
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-sentiment-neg: #d84a3a;
+  --color-sentiment-neu: #c9c8c3;
+  --color-sentiment-pos: #2a78d6;
+}
+
+.dark {
+  --color-chart-1: #3987e5;
+  --color-chart-2: #d95926;
+  --color-chart-3: #199e70;
+  --color-chart-4: #c98500;
+  --color-sentiment-neu: #4a4a46;
+  --color-sentiment-pos: #3987e5;
+}
+
+body {
+  @apply bg-slate-50 font-sans text-slate-900 antialiased dark:bg-[#070b17] dark:text-slate-100;
+  font-feature-settings: "tnum" 1; /* цифры одной ширины — столбцы метрик не «пляшут» */
+}
+
+h1, h2, h3 {
+  @apply font-display;
+}
+
+.card {
+  @apply rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04];
+}
+
+.grad-text {
+  @apply bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent dark:from-brand-400 dark:to-sky-300;
+}
+
+/* Видимый фокус для клавиатуры на всех интерактивных элементах (WCAG 2.4.7) */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  @apply outline-2 outline-offset-2 outline-brand-600 dark:outline-brand-400;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
