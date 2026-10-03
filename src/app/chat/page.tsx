@@ -28,6 +28,7 @@ const SUGGESTIONS = [
   "Прислали не тот товар в заказе 48170",
   "Хочу отменить заказ 48230",
   "Не применился промокод при оплате",
+  "Сәлеметсіз бе, 48190 тапсырысым қашан келеді?",
 ];
 
 const time = (at: number) => new Date(at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
@@ -252,7 +253,18 @@ export default function CustomerChat() {
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); send(text); }} className="border-t border-slate-200 p-3 dark:border-white/10">
-        {error && <p role="alert" className="mb-2 text-sm text-rose-700 dark:text-rose-400">{error}</p>}
+        {/* Жюри не придумывает, что спросить: после первого сообщения — ещё не отправленные примеры */}
+        {messages.length > 0 && !sending && (
+          <div className="-mx-3 mb-2 flex gap-2 overflow-x-auto px-3 pb-1" aria-label="Что ещё можно спросить">
+            {SUGGESTIONS.filter((s) => !messages.some((m) => m.text === s)).map((s) => (
+              <button key={s} type="button" onClick={() => send(s)}
+                className="min-h-9 shrink-0 rounded-full border border-slate-300 px-3 text-sm hover:border-brand-600 hover:bg-brand-50 dark:border-white/15 dark:hover:bg-brand-500/10">
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+        {error &&<p role="alert" className="mb-2 text-sm text-rose-700 dark:text-rose-400">{error}</p>}
         {recSec !== null && (
           <p role="status" className="mb-2 flex items-center gap-2 text-sm font-medium text-rose-700 dark:text-rose-400">
             <span className="size-2.5 animate-pulse rounded-full bg-rose-600" aria-hidden />
