@@ -233,7 +233,8 @@ function RoiCard({ aht, defaultDeflection }: { aht: Stats["aht"]; defaultDeflect
   const [tickets, setTickets] = useState(3000);
   const [salary, setSalary] = useState(350_000);
   const [deflection, setDeflection] = useState(Math.round(defaultDeflection * 100));
-  const r = roi({ ticketsPerMonth: tickets, deflection: deflection / 100, salaryPerMonth: salary, ahtWithoutSec: aht.withoutAi, ahtWithSec: aht.withAi });
+  const [aiCost, setAiCost] = useState(2); // ₸ за обращение, с запасом: LLM-запрос стоит доли тенге
+  const r = roi({ ticketsPerMonth: tickets, deflection: deflection / 100, salaryPerMonth: salary, ahtWithoutSec: aht.withoutAi, ahtWithSec: aht.withAi, aiCostPerTicket: aiCost });
   const field = "h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base font-semibold focus:border-brand-600 dark:border-white/15 dark:bg-white/5";
   const tenge = (n: number) => n.toLocaleString("ru-RU") + " ₸";
   return (
@@ -260,12 +261,18 @@ function RoiCard({ aht, defaultDeflection }: { aht: Stats["aht"]; defaultDeflect
               onChange={(e) => setDeflection(Number(e.target.value))} className="w-full accent-brand-600" />
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Сейчас у SupportPulse — {Math.round(defaultDeflection * 100)}%</p>
           </div>
+          <div>
+            <label htmlFor="roi-aicost" className="mb-1.5 block text-sm font-medium">Расход на AI, ₸ за обращение</label>
+            <input id="roi-aicost" type="number" inputMode="decimal" min={0} step={0.5} value={aiCost}
+              onChange={(e) => setAiCost(Math.max(0, Number(e.target.value) || 0))} className={field} />
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">LLM, распознавание голоса и сервер — с запасом. Считается по всем обращениям</p>
+          </div>
         </div>
         <div aria-live="polite" className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-gradient-to-br from-brand-800 to-brand-600 p-5 text-white sm:col-span-2">
-            <div className="text-sm text-white/90">Экономия в месяц</div>
+            <div className="text-sm text-white/90">Чистая экономия в месяц</div>
             <div className="font-display text-4xl font-extrabold tracking-tight">{tenge(r.moneySaved)}</div>
-            <div className="mt-1 text-sm text-white/90">{tenge(r.moneySavedYear)} в год</div>
+            <div className="mt-1 text-sm text-white/90">{tenge(r.moneySavedYear)} в год · уже за вычетом AI: {tenge(r.grossSaved)} − {tenge(r.aiCost)}</div>
           </div>
           <RoiStat label="Часов операторов освобождается" value={`${r.hoursSaved.toLocaleString("ru-RU")} ч`} />
           <RoiStat label="Это как ставка операторов" value={r.operatorsFreed.toLocaleString("ru-RU")} />

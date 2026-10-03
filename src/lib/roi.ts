@@ -6,14 +6,20 @@ export type RoiInput = {
   ahtWithoutSec: number;
   ahtWithSec: number;
   hoursPerMonth?: number; // рабочих часов оператора в месяц
+  aiCostPerTicket?: number; // ₸ за обращение (LLM, Whisper, сервер) — через AI идут ВСЕ обращения
 };
 
-export function roi({ ticketsPerMonth, deflection, salaryPerMonth, ahtWithoutSec, ahtWithSec, hoursPerMonth = 168 }: RoiInput) {
-  const deflected = Math.round(Math.max(0, ticketsPerMonth) * Math.min(1, Math.max(0, deflection)));
+export function roi({ ticketsPerMonth, deflection, salaryPerMonth, ahtWithoutSec, ahtWithSec, hoursPerMonth = 168, aiCostPerTicket = 0 }: RoiInput) {
+  const tickets = Math.max(0, ticketsPerMonth);
+  const deflected = Math.round(tickets * Math.min(1, Math.max(0, deflection)));
   const hoursSaved = (deflected * Math.max(0, ahtWithoutSec - ahtWithSec)) / 3600;
-  const moneySaved = Math.round((hoursSaved * Math.max(0, salaryPerMonth)) / hoursPerMonth);
+  const grossSaved = Math.round((hoursSaved * Math.max(0, salaryPerMonth)) / hoursPerMonth);
+  const aiCost = Math.round(tickets * Math.max(0, aiCostPerTicket));
+  const moneySaved = grossSaved - aiCost; // чистая экономия
   return {
     deflected,
+    grossSaved,
+    aiCost,
     hoursSaved: Math.round(hoursSaved),
     moneySaved,
     moneySavedYear: moneySaved * 12,

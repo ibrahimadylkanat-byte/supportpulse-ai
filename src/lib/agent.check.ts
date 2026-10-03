@@ -107,6 +107,10 @@ assert.equal(r.deflected, 2087);
 assert.equal(r.hoursSaved, 142);
 assert.equal(r.moneySaved, 295_900);
 assert.equal(r.operatorsFreed, 0.8);
+const rc = roi({ ticketsPerMonth: 3000, deflection: 0.62, salaryPerMonth: 350_000, ahtWithoutSec: 270, ahtWithSec: 25, aiCostPerTicket: 2 });
+assert.equal(rc.grossSaved, 263_715);
+assert.equal(rc.aiCost, 6_000);
+assert.equal(rc.moneySaved, 257_715);
 assert.equal(roi({ ticketsPerMonth: -5, deflection: 2, salaryPerMonth: 1, ahtWithoutSec: 270, ahtWithSec: 25 }).deflected, 0);
 console.log("ok: roi");
 
