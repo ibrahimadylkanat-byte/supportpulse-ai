@@ -177,6 +177,7 @@ export async function clearTickets() {
   d.byKey.clear();
   d.seq = 0;
   dirty().clear();
-  if (redisUrl()) await redis("DEL", T, K, S);
+  // Счётчик номеров не сбрасываем: у телефона, писавшего до сброса, в памяти старый L-001 — он не должен открыть чужой чат
+  if (redisUrl()) await redis("DEL", T, K);
   else persist();
 }
