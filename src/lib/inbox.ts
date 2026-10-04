@@ -47,7 +47,7 @@ export async function handleCustomerMessage(p: Incoming): Promise<Ticket> {
         : { input, result, status, customer, responded: false, waitingSince: at },
     );
     t.messages.push(...msgs);
-    persist();
+    persist(t.id);
     return t;
   }
   return saveTicket(
@@ -80,13 +80,13 @@ export async function operatorReply(id: string, text: string, resolved: boolean)
       t.messages.push({ from: "system", text: `Не удалось доставить в Telegram: ${(e as Error).message}`, at });
     }
   }
-  persist();
+  persist(t.id);
   return t;
 }
 
 export function addSystemMessage(id: string, text: string) {
   getTicket(id)?.messages.push({ from: "system", text, at: Date.now() });
-  persist();
+  persist(id);
 }
 
 /** Последняя реплика по существу (AI или оператор), если она — последнее слово в диалоге. */
@@ -121,7 +121,7 @@ export function rateTicket(id: string, rating: "up" | "down"): Ticket | null {
       { from: "ai", text: `Понял, что ответ не помог. Подключаю оператора — он ответит в течение ${FIRST_RESPONSE_TEXT[t.result.urgency]}.`, at, ack: true },
     );
   }
-  persist();
+  persist(t.id);
   return t;
 }
 

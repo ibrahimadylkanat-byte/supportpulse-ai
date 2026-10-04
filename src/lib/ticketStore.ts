@@ -61,11 +61,61 @@ function load(): Db {
 }
 
 // globalThis — чтобы перезагрузка модулей в dev и фоновый Telegram-поллер видели одни и те же данные
-const g = globalThis as unknown as { __tickets?: Db; __ticketsTimer?: ReturnType<typeof setTimeout> };
+const g = globalThis as unknown as { __tickets?: Db; __ticketsTimer?: ReturnType<typeof setTimeout>; __dirty?: Set<string> };
 const db = () => (g.__tickets ??= load());
+const dirty = () => (g.__dirty ??= new Set());
 
-/** Сохранить на диск (с задержкой — пачка изменений пишется одним разом). */
-export function persist() {
+// На Vercel несколько копий сервера, у каждой своя память — общий источник правды в Upstash Redis (REST, без зависимостей).
+// Переменные добавляет интеграция Upstash в Vercel. Без них — файл, как на ноутбуке.
+const redisUrl = () => process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+const T = "sp:tickets", K = "sp:keys", S = "sp:seq";
+
+async function redis(...cmd: (string | number)[]) {
+  const res = await fetch(redisUrl()!, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN}` },
+    body: JSON.stringify(cmd),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`Redis ${res.status}`);
+  return (await res.json()).result;
+}
+
+const pairs = (flat: string[] | null) => Array.from({ length: (flat?.length ?? 0) / 2 }, (_, i) => [flat![2 * i], flat![2 * i + 1]]);
+
+/** Подтянуть тикеты из Redis в память этой копии сервера — в начале каждого запроса. */
+export async function syncTickets() {
+  if (!redisUrl()) return;
+  const [tickets, keys] = await Promise.all([redis("HGETALL", T), redis("HGETALL", K)]);
+  const d = db();
+  d.byId = new Map(pairs(tickets).map(([id, json]) => [id, JSON.parse(json) as Ticket]));
+  d.byKey = new Map(pairs(keys) as [string, string][]);
+}
+
+/** Записать изменённые тикеты в Redis — до ответа клиенту, пока функция Vercel не заморожена. */
+export async function flushTickets() {
+  if (!redisUrl() || !dirty().size) return;
+  const ids = [...dirty()].filter((id) => db().byId.has(id));
+  dirty().clear();
+  if (ids.length) await redis("HSET", T, ...ids.flatMap((id) => [id, JSON.stringify(db().byId.get(id))]));
+}
+
+/** Обёртка для API-маршрутов: свежие тикеты до обработчика, запись — после. */
+export const withTickets = <A extends unknown[]>(h: (...a: A) => Promise<Response>) => async (...a: A) => {
+  await syncTickets();
+  try {
+    return await h(...a);
+  } finally {
+    await flushTickets();
+  }
+};
+
+/** Сохранить: в Redis — помечаем тикет (пишет flushTickets), иначе на диск с задержкой — пачка изменений одним разом. */
+export function persist(id?: string) {
+  if (redisUrl()) {
+    if (id) dirty().add(id);
+    return;
+  }
   const f = file();
   if (!f) return;
   clearTimeout(g.__ticketsTimer);
@@ -81,14 +131,18 @@ export function persist() {
 }
 
 /** dedupeKey: одно и то же демо-обращение — один тикет, перезагрузка панели не плодит дубли. */
-export function saveTicket(t: Omit<Ticket, "id">, dedupeKey?: string): Ticket {
+export async function saveTicket(t: Omit<Ticket, "id">, dedupeKey?: string): Promise<Ticket> {
   const d = db();
   const prevId = dedupeKey ? d.byKey.get(dedupeKey) : undefined;
-  const id = prevId ?? `L-${String(++d.seq).padStart(3, "0")}`;
+  // Номер из Redis общий для всех копий сервера — иначе две копии выдадут один и тот же L-001
+  const id = prevId ?? `L-${String(redisUrl() ? await redis("INCR", S) : ++d.seq).padStart(3, "0")}`;
   const ticket = { ...t, id };
   d.byId.set(id, ticket);
-  if (dedupeKey) d.byKey.set(dedupeKey, id);
-  persist();
+  if (dedupeKey) {
+    d.byKey.set(dedupeKey, id);
+    if (redisUrl()) await redis("HSET", K, dedupeKey, id);
+  }
+  persist(id);
   return ticket;
 }
 
@@ -117,10 +171,12 @@ export function liveTickets(now = Date.now()): DashboardTicket[] {
 }
 
 /** Сброс перед новым демо. */
-export function clearTickets() {
+export async function clearTickets() {
   const d = db();
   d.byId.clear();
   d.byKey.clear();
   d.seq = 0;
-  persist();
+  dirty().clear();
+  if (redisUrl()) await redis("DEL", T, K, S);
+  else persist();
 }

@@ -1,8 +1,9 @@
 import { cancelOrder, createReturnRequest } from "@/lib/services/moyskladService";
 import { createClaim, createReturnWaybill, extendStorage } from "@/lib/services/cdekService";
 import { addSystemMessage } from "@/lib/inbox";
+import { withTickets } from "@/lib/ticketStore";
 
-export async function POST(req: Request) {
+export const POST = withTickets(async (req: Request) => {
   const { action, order_id, track, ticket_id } = await req.json().catch(() => ({}));
   const res = await run(action, order_id, track);
   // Результат действия — в переписку тикета, чтобы его видели все операторы
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
     addSystemMessage(ticket_id, res.ok ? `✓ ${j.message}` : `Ошибка: ${j.error}`);
   }
   return res;
-}
+});
 
 async function run(action: unknown, order_id: unknown, track: unknown): Promise<Response> {
   // Возврат без найденного заказа давал «накладная №NaN» — сначала нужен номер заказа

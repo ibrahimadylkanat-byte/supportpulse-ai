@@ -192,3 +192,49 @@ assert.ok(looksLikeHallucination("Субтитры сделал DimaTorzok"));
 assert.ok(!looksLikeHallucination("Где мой заказ 48201? Жду уже неделю"));
 assert.ok(!looksLikeHallucination("да да"));
 console.log("ok: whisper filter");
+
+// Vercel: две копии сервера с общим Redis видят одни тикеты и не выдают один номер дважды.
+// Мини-Redis в памяти отвечает как Upstash REST: POST ["КОМАНДА", ...аргументы] → { result }.
+import http from "node:http";
+import { flushTickets, getTicket, syncTickets } from "./ticketStore.ts";
+const store = { h: new Map<string, Map<string, string>>(), n: new Map<string, number>() };
+const hash = (k: string) => store.h.get(k) ?? store.h.set(k, new Map()).get(k)!;
+const fake = http.createServer((req, res) => {
+  let b = "";
+  req.on("data", (c) => (b += c)).on("end", () => {
+    const [cmd, key, ...args] = JSON.parse(b) as string[];
+    let result: unknown = "OK";
+    if (cmd === "HGETALL") result = [...hash(key)].flat();
+    else if (cmd === "HSET") for (let i = 0; i < args.length; i += 2) hash(key).set(args[i], args[i + 1]);
+    else if (cmd === "INCR") store.n.set(key, (result = (store.n.get(key) ?? 0) + 1) as number);
+    else if (cmd === "DEL") [key, ...args].forEach((k) => (store.h.delete(k), store.n.delete(k)));
+    res.end(JSON.stringify({ result }));
+  });
+}).listen(0);
+await new Promise((r) => fake.once("listening", r));
+process.env.KV_REST_API_URL = `http://127.0.0.1:${(fake.address() as { port: number }).port}`;
+process.env.KV_REST_API_TOKEN = "test";
+const instance = () => { (globalThis as { __tickets?: unknown }).__tickets = undefined; }; // новая копия сервера — пустая память
+await clearTickets();
+instance();
+await syncTickets();
+const r1 = await handleCustomerMessage({ channel: "chat", message: "Где мой заказ 48201?" });
+await flushTickets();
+instance();
+await syncTickets();
+assert.equal(getTicket(r1.id)?.messages[0].text, "Где мой заказ 48201?", "вторая копия видит тикет первой");
+const r2 = await handleCustomerMessage({ channel: "chat", message: "Хочу отменить заказ 48230" });
+await flushTickets();
+assert.notEqual(r2.id, r1.id, "номера тикетов не повторяются между копиями");
+await operatorReply(r1.id, "Проверили, всё в пути", false);
+await flushTickets();
+instance();
+await syncTickets();
+assert.ok(getTicket(r1.id)!.messages.some((m) => m.text === "Проверили, всё в пути"), "ответ оператора виден в другой копии");
+await clearTickets();
+instance();
+await syncTickets();
+assert.equal(allTickets().length, 0);
+delete process.env.KV_REST_API_URL;
+fake.close();
+console.log("ok: shared redis store");

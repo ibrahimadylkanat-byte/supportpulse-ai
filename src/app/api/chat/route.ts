@@ -1,11 +1,11 @@
 import { customerView, handleCustomerMessage } from "@/lib/inbox";
 import { clientIp, tooMany } from "@/lib/rateLimit";
-import { getTicket } from "@/lib/ticketStore";
+import { getTicket, withTickets } from "@/lib/ticketStore";
 import { describePhoto, photoNote } from "@/lib/vision";
 
 // Чат клиента на сайте: отправка сообщения (текст, голос, фото) и опрос новых ответов.
 // Клиент видит только переписку, без разбора агента.
-export async function POST(req: Request) {
+export const POST = withTickets(async (req: Request) => {
   if (tooMany(clientIp(req))) return Response.json({ error: "Слишком много сообщений, подождите минуту" }, { status: 429 });
   const body = await req.json().catch(() => null);
   const message = typeof body?.message === "string" ? body.message.trim() : "";
@@ -26,10 +26,10 @@ export async function POST(req: Request) {
     agentMessage: image ? photoNote(message, await describePhoto(image, message)) : undefined,
   });
   return Response.json(customerView(t));
-}
+});
 
-export async function GET(req: Request) {
+export const GET = withTickets(async (req: Request) => {
   const t = getTicket(new URL(req.url).searchParams.get("id") ?? "");
   if (!t || t.channel !== "chat") return Response.json({ error: "not found" }, { status: 404 });
   return Response.json(customerView(t));
-}
+});

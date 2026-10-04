@@ -9,9 +9,9 @@ import {
   slaPolicy,
   type Period,
 } from "@/lib/mockData";
-import { allTickets, liveTickets } from "@/lib/ticketStore";
+import { allTickets, liveTickets, withTickets } from "@/lib/ticketStore";
 
-export async function GET(req: Request) {
+export const GET = withTickets(async (req: Request) => {
   const p = new URL(req.url).searchParams.get("period") as Period;
   const period: Period = p in analyticsRaw ? p : "month";
   const raw = analyticsRaw[period];
@@ -67,4 +67,4 @@ export async function GET(req: Request) {
       return { up: rated.filter((t) => t.csat === "up").length, total: rated.length };
     })(),
   });
-}
+});

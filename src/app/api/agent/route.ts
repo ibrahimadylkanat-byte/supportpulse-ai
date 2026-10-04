@@ -1,7 +1,8 @@
 import { handleCustomerMessage } from "@/lib/inbox";
+import { withTickets } from "@/lib/ticketStore";
 
 // Демо-обращения и «+ Обращение» из панели оператора
-export async function POST(req: Request) {
+export const POST = withTickets(async (req: Request) => {
   const body = await req.json().catch(() => null);
   if (!body || typeof body.message !== "string" || !body.message.trim() || body.message.length > 4000) {
     return Response.json({ error: "message (string, 1..4000) is required" }, { status: 400 });
@@ -17,4 +18,4 @@ export async function POST(req: Request) {
     dedupeKey: [input.message.trim(), input.order_id ?? "", input.phone ?? ""].join("|"),
   });
   return Response.json({ ...t.result, ticketId: t.id });
-}
+});
