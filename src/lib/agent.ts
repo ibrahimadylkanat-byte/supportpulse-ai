@@ -49,7 +49,7 @@ export type AgentResult = Classification & {
 
 const AUTO_THRESHOLD = 0.9;
 
-const fmtDate = (iso: string) =>
+export const fmtDate = (iso: string) =>
   /^\d{4}-\d{2}-\d{2}/.test(iso)
     ? new Date(iso.slice(0, 10)).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })
     : iso;

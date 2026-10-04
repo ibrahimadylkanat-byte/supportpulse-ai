@@ -30,7 +30,7 @@ const STATUS_BADGE: Record<Status, { label: string; cls: string }> = {
   closed: { label: "Завершён", cls: "bg-slate-500/10 text-slate-700 dark:text-slate-400" },
 };
 
-const CHANNEL_LABEL: Record<Channel, string> = { demo: "Демо", chat: "Чат на сайте", telegram: "Telegram" };
+const CHANNEL_LABEL: Record<Channel, string> = { demo: "Демо", chat: "Чат на сайте", telegram: "Telegram", proactive: "AI написал первым" };
 
 const URGENCY: Record<string, string> = {
   low: "text-emerald-700 dark:text-emerald-400",

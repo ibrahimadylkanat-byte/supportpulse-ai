@@ -193,6 +193,20 @@ assert.ok(!looksLikeHallucination("Где мой заказ 48201? Жду уже
 assert.ok(!looksLikeHallucination("да да"));
 console.log("ok: whisper filter");
 
+// Проактивность: AI сам пишет первым по проблемным заказам, хранение продлевает один раз
+import { runProactive } from "./proactive.ts";
+await clearTickets();
+const pro = await runProactive();
+const delayed = pro.find((t) => t.result.order?.id === "48190")!;
+assert.ok(delayed.messages.some((m) => m.text.startsWith("🤖 AI выполнил: продлил хранение")));
+assert.ok(delayed.result.reply.includes("№48190") && delayed.result.reply.includes("6 октября"), "номер и дата из данных заказа");
+assert.ok(pro.some((t) => t.result.order?.id === "48177"), "напоминание о хранении в ПВЗ");
+assert.ok(pro.every((t) => t.channel === "proactive" && t.status === "auto_resolved"));
+const again = await runProactive();
+assert.equal(again.length, pro.length, "повторный запуск не плодит тикеты");
+assert.equal(allTickets().length, pro.length);
+console.log("ok: proactive");
+
 // Vercel: две копии сервера с общим Redis видят одни тикеты и не выдают один номер дважды.
 // Мини-Redis в памяти отвечает как Upstash REST: POST ["КОМАНДА", ...аргументы] → { result }.
 import http from "node:http";

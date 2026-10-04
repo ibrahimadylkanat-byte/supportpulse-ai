@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Bot, Camera, Frown, Headset, Meh, MessageCircle, Mic, PiggyBank, Play, RotateCcw, Send, Smile, Sparkles, Square, ThumbsUp, Timer, Zap } from "lucide-react";
+import { BellRing, Bot, Camera, Frown, Headset, Loader2, Meh, MessageCircle, Mic, PiggyBank, Play, RotateCcw, Send, Smile, Sparkles, Square, ThumbsUp, Timer, Zap } from "lucide-react";
 import type { Ticket } from "@/lib/ticketStore";
 import { AHT_WITH_AI_SEC, AHT_WITHOUT_AI_SEC } from "@/lib/mockData";
 
@@ -35,6 +35,7 @@ type FeedItem = {
   voice?: boolean;
   image?: string;
   performed?: string; // действие, которое AI выполнил сам
+  proactive?: boolean; // AI написал первым, вопроса не было
 };
 
 const URL_KEY = "supportpulse-live-url";
@@ -48,8 +49,14 @@ const SENTIMENT = {
 function toFeed(tickets: Ticket[]): FeedItem[] {
   return tickets
     .filter((t) => t.channel !== "demo")
-    .flatMap((t) =>
-      t.messages.flatMap((m, i) => {
+    .flatMap((t): FeedItem[] =>
+      t.channel === "proactive"
+        ? [{
+            key: t.id, channel: t.channel, customer: t.customer, question: "", sentiment: "neutral", auto: true, at: t.createdAt, proactive: true,
+            answer: { from: "ai", text: t.result.reply, seconds: 0 },
+            performed: t.result.performed?.[0],
+          }]
+        : t.messages.flatMap((m, i) => {
         if (m.from !== "customer") return [];
         const reply = t.messages.slice(i + 1).find((r) => r.from !== "system");
         const answer =
@@ -136,7 +143,15 @@ export default function LiveWall() {
     poll();
   }
 
-  const answered = feed.filter((f) => f.answer?.from === "ai");
+  const [proactiveBusy, setProactiveBusy] = useState(false);
+  async function runProactive() {
+    setProactiveBusy(true);
+    await fetch("/api/proactive", { method: "POST" }).catch(() => {});
+    await poll();
+    setProactiveBusy(false);
+  }
+
+  const answered = feed.filter((f) => f.answer?.from === "ai" && !f.proactive); // проактивные — без вопроса, времени ответа нет
   const autoCount = feed.filter((f) => f.auto).length;
   const savedMin = (autoCount * SAVED_SEC_PER_AUTO) / 60;
   const savedTenge = Math.round((savedMin / 60) * OPERATOR_COST_PER_HOUR);
@@ -181,6 +196,10 @@ export default function LiveWall() {
               className={`flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold ${demoStep === null ? "bg-white/10 hover:bg-white/15" : "bg-rose-600 hover:bg-rose-500"}`}
             >
               {demoStep === null ? <><Play className="size-4" aria-hidden /> Автодемо</> : <><Square className="size-3.5 fill-current" aria-hidden /> Стоп ({demoStep}/{AUTO_DEMO.length})</>}
+            </button>
+            <button onClick={runProactive} disabled={proactiveBusy}
+              className="flex min-h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-60">
+              {proactiveBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <BellRing className="size-4" aria-hidden />} AI: предупредить клиентов
             </button>
             {editing ? (
               <form
@@ -247,6 +266,20 @@ export default function LiveWall() {
             )}
             {feed.slice(0, 5).map((f) => {
               const S = SENTIMENT[f.sentiment];
+              if (f.proactive) return (
+                <li key={f.key} className="animate-[feed-in_400ms_ease-out] rounded-3xl border border-emerald-400/30 bg-emerald-400/10 p-5">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="flex items-center gap-1.5 font-semibold text-emerald-200"><BellRing className="size-4" aria-hidden /> AI написал первым</span>
+                    <span className="text-slate-300">→ {f.customer} · клиент ещё не успел спросить</span>
+                  </div>
+                  {f.performed && (
+                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-sm font-semibold text-emerald-200">
+                      <Zap className="size-3.5" aria-hidden /> AI сам: {f.performed}
+                    </p>
+                  )}
+                  <p className="mt-2 line-clamp-3 text-base leading-relaxed text-slate-100">{f.answer!.text}</p>
+                </li>
+              );
               return (
                 <li key={f.key} className="animate-[feed-in_400ms_ease-out] rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
                   <div className="flex flex-wrap items-center gap-2 text-sm">

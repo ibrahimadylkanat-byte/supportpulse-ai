@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AgentInput, DashboardTicket, Priority } from "./mockData.ts";
 import type { AgentResult } from "./agent.ts";
 
-export type Channel = "demo" | "chat" | "telegram";
+export type Channel = "demo" | "chat" | "telegram" | "proactive"; // proactive — AI написал первым
 export type TicketMsg = {
   from: "customer" | "ai" | "operator" | "system";
   text: string;
